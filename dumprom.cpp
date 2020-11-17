@@ -26,12 +26,22 @@ Reference documentation;
 #include <iostream>
 #include <streambuf>
 
+#ifdef _MSC_VER
+#define PACK_PRE __pragma (pack( push, 1))
+#define PACK_POST __pragma (pack( pop ))
+#define PACK_ATTRIBUTE
+#else
+#define PACK_PRE
+#define PACK_POST
+#define PACK_ATTRIBUTE __attribute__((packed))
+#endif
 
+PACK_PRE
 struct RomHeader
 {
     uint8_t id[2]; // 0xE5, (0x37=M format, 0x50=P format)
-    uint8_t capacity; // 0x20=256kbits, 0x40=512kbits, 0x80=1mbits
-    uint16_t checksum;
+    uint8_t capacity; // 0x08=64kbits, 0x10=128kbits, 0x20=256kbits, 0x40=512kbits, 0x80=1mbits
+    uint8_t checksum[2];
     uint8_t system_name[3];
     uint8_t rom_name[14];
     uint8_t dir_entries; // number of entries + 1 (then rounded up to a multiple of 4)
@@ -40,7 +50,7 @@ struct RomHeader
     uint8_t month[2];
     uint8_t day[2];
     uint8_t year[2];
-} __attribute__((packed));
+} PACK_ATTRIBUTE;
 
 struct DirEntry
 {
@@ -51,7 +61,8 @@ struct DirEntry
     uint16_t zero;
     uint8_t record_count; // 0 to 128. number of 128 byte records controlled by the dir entry
     uint8_t allocation_map[16]; // The IDs of each 1K block used by the file
-} __attribute__((packed));
+} PACK_ATTRIBUTE;
+PACK_POST
 
 
 static uint8_t* file_area_offset(const RomHeader* const hdr)
@@ -87,7 +98,7 @@ static std::string trim(const std::string& s)
 {
     std::string::size_type pos = s.find_first_of(' ');
 
-    if(pos = std::string::npos)
+    if(pos == std::string::npos)
     {
         return s;
     }
@@ -127,8 +138,8 @@ static void dump_files(const uint8_t* romBase, const uint32_t romSize)
                 outFile.close();
 
                 extentNo = 0;
-                fileName = std::string(dir->file_name, dir->file_type+sizeof(DirEntry::file_name)+1);
-                extension = std::string(dir->file_type, dir->file_type+sizeof(DirEntry::file_type)+1);
+                fileName = std::string(dir->file_name, dir->file_name+sizeof(DirEntry::file_name));
+                extension = std::string(dir->file_type, dir->file_type+sizeof(DirEntry::file_type));
 
                 fileName = trim(fileName);
                 extension = trim(extension);
@@ -210,7 +221,7 @@ int main(int argc, char* argv[])
         memcpy(&buffer[0x4000], &temp[0], 0x4000);
     }
 
-    dump_files(buffer.data(), buffer.size());
+    dump_files(buffer.data(), (uint32_t)buffer.size());
 
     return 0;
 }

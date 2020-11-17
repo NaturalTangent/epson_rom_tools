@@ -28,9 +28,19 @@ Reference documentation;
 #include <streambuf>
 
 
-const uint MAGIC = 0xe5;
-const uint MAGIC_P = 0x50; // Not supported
-const uint MAGIC_M = 0x37;
+#ifdef _MSC_VER
+#define PACK_PRE __pragma (pack( push, 1))
+#define PACK_POST __pragma (pack( pop ))
+#define PACK_ATTRIBUTE
+#else
+#define PACK_PRE
+#define PACK_POST
+#define PACK_ATTRIBUTE __attribute__((packed))
+#endif
+
+const uint8_t MAGIC = 0xe5;
+const uint8_t MAGIC_P = 0x50; // Not supported
+const uint8_t MAGIC_M = 0x37;
 
 const uint8_t CAPACITY_64kbit = 0x08;
 const uint8_t CAPACITY_128kbit = 0x10;
@@ -43,6 +53,7 @@ const uint8_t MAX_DIR_ENTRIES = 0x20;
 const uint8_t DIR_ENTRY_INVALID = 0xe5;
 const uint8_t DIR_ENTRY_VALID = 0x00;
 
+PACK_PRE
 struct RomHeader
 {
     uint8_t id[2]; // 0xE5, (0x37=M format, 0x50=P format)
@@ -56,7 +67,7 @@ struct RomHeader
     uint8_t month[2];
     uint8_t day[2];
     uint8_t year[2];
-} __attribute__((packed));
+} PACK_ATTRIBUTE;
 
 struct DirEntry
 {
@@ -67,8 +78,8 @@ struct DirEntry
     uint16_t zero;
     uint8_t record_count; // 0 to 128. number of 128 byte records controlled by the dir entry
     uint8_t allocation_map[16]; // The IDs of each 1K block used by the file
-} __attribute__((packed));
-
+} PACK_ATTRIBUTE;
+PACK_POST
 
 static void fatal(const char* msg, const char* param = NULL)
 {
@@ -185,20 +196,20 @@ int main(int argc, char* argv[])
         std::vector<uint8_t> buffer((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
 
         // Calculate number of 1K chunks
-        int chunks = (buffer.size() + 1023) / 1024;
+        size_t chunks = (buffer.size() + 1023) / 1024;
 
         // pad file to 1KB boundary
         if(buffer.size() < (chunks * 1024))
         {
             size_t diff = (chunks*1024) - buffer.size();
             buffer.resize(buffer.size() + diff);
-            memset(&buffer[buffer.size()-diff], diff, 0);
+            memset(&buffer[buffer.size()-diff], (int)diff, 0);
         }
 
         // Make space for the file
         int allocationIndex = 0;
         int nextLogicalExtent = 0;
-        int file_area_offset = file_area.size();
+        int file_area_offset = (int)file_area.size();
         int buffer_offset = 0;
         file_area.resize(file_area.size() + (chunks*1024));
 
@@ -209,7 +220,7 @@ int main(int argc, char* argv[])
         dirBase[currentDirectory].logical_extent = nextLogicalExtent++;
 
         // Append to file area in 1K chunks
-        for(int iChunk=0; iChunk<chunks; ++iChunk)
+        for(size_t iChunk=0; iChunk<chunks; ++iChunk)
         {
             if(allocationIndex >= 16)
             {
@@ -238,7 +249,7 @@ int main(int argc, char* argv[])
 
     // Update the header to reflect the files that have been stored
     hdr->dir_entries = ((currentDirectory + 3) / 4) * 4;
-    uint16_t checksum = file_area.size();
+    uint16_t checksum = (uint16_t)file_area.size();
     hdr->checksum[0] = checksum & 0xff;
     hdr->checksum[1] = (checksum >> 8) & 0xff;
 
