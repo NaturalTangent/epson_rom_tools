@@ -144,6 +144,10 @@ static void dump_files(const uint8_t* romBase, const uint32_t romSize)
                 fileName = trim(fileName);
                 extension = trim(extension);
 
+                // Some ROMs (i.e. the Epson Utils) have bit 0x80 set in the first character of the file type.
+                // Haven't found any documentation indicating why. Unset it here to give a valid file name.
+                extension[0] &= 0x7f;
+
                 // open new file
                 outFile.open(fileName + "." + extension, std::ios::out | std::ios::binary);
                 if(!outFile) fatal("Could not open output file.");
