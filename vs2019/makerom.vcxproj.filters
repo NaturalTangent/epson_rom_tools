@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="makerom.cpp">
+    <ClCompile Include="..\makerom.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
