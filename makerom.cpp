@@ -53,6 +53,8 @@ const uint8_t MAX_DIR_ENTRIES = 0x20;
 const uint8_t DIR_ENTRY_INVALID = 0xe5;
 const uint8_t DIR_ENTRY_VALID = 0x00;
 
+const uint32_t RECORD_SIZE = 128;
+
 PACK_PRE
 struct RomHeader
 {
@@ -198,10 +200,13 @@ int main(int argc, char* argv[])
         // Calculate number of 1K chunks
         size_t chunks = (buffer.size() + 1023) / 1024;
 
-        // pad file to 1KB boundary
-        if(buffer.size() < (chunks * 1024))
+        // Calculate number of 128Byte records
+        size_t records = (buffer.size() + 127) / 128;
+
+        // pad file to 128Byte boundary
+        if(buffer.size() < (records * 128))
         {
-            size_t diff = (chunks*1024) - buffer.size();
+            size_t diff = (records*128) - buffer.size();
             buffer.resize(buffer.size() + diff);
             memset(&buffer[buffer.size()-diff], (int)diff, 0);
         }
@@ -211,7 +216,7 @@ int main(int argc, char* argv[])
         int nextLogicalExtent = 0;
         int file_area_offset = (int)file_area.size();
         int buffer_offset = 0;
-        file_area.resize(file_area.size() + (chunks*1024));
+        file_area.resize(file_area.size() + (records*128));
 
         // Reserve a directory entry
         memset(&dirBase[currentDirectory], 0, sizeof(DirEntry));
@@ -219,7 +224,9 @@ int main(int argc, char* argv[])
         memcpy(&dirBase[currentDirectory].file_type, type, 3);
         dirBase[currentDirectory].logical_extent = nextLogicalExtent++;
 
-        // Append to file area in 1K chunks
+        // Append to file area in 1K/128byte chunks
+        uint32_t bytesRemaining = records * 128;
+
         for(size_t iChunk=0; iChunk<chunks; ++iChunk)
         {
             if(allocationIndex >= 16)
@@ -237,12 +244,14 @@ int main(int argc, char* argv[])
                 dirBase[currentDirectory].logical_extent = nextLogicalExtent++;
             }
 
-            dirBase[currentDirectory].record_count += (1024/128);
+            uint32_t chunkSize = (bytesRemaining >= 1024) ? 1024 : bytesRemaining;
+
+            dirBase[currentDirectory].record_count += (chunkSize/128);
             dirBase[currentDirectory].allocation_map[allocationIndex++] = nextAllocation++;
 
-            memcpy(&file_area[file_area_offset], &buffer[buffer_offset], 1024);
-            buffer_offset += 1024;
-            file_area_offset += 1024;
+            memcpy(&file_area[file_area_offset], &buffer[buffer_offset], chunkSize);
+            buffer_offset += chunkSize;
+            file_area_offset += chunkSize;
         }
 
     }

@@ -36,6 +36,8 @@ Reference documentation;
 #define PACK_ATTRIBUTE __attribute__((packed))
 #endif
 
+const uint32_t RECORD_SIZE = 128;
+
 PACK_PRE
 struct RomHeader
 {
@@ -132,6 +134,8 @@ static void dump_files(const uint8_t* romBase, const uint32_t romSize)
 
         if(dir->validity == 0x00)
         {
+            uint32_t bytesRemaining = dir->record_count * RECORD_SIZE;
+
             if(dir->logical_extent == 0)
             {
                 // close current file
@@ -144,9 +148,11 @@ static void dump_files(const uint8_t* romBase, const uint32_t romSize)
                 fileName = trim(fileName);
                 extension = trim(extension);
 
-                // Some ROMs (i.e. the Epson Utils) have bit 0x80 set in the first character of the file type.
-                // Haven't found any documentation indicating why. Unset it here to give a valid file name.
+                // Some ROMs (i.e. the Epson Utils) have bit 0x80 set in the the file type characters.
+                // I think this indicates attributes such as ReadOnly etc. Mask them out to make a valid file name.
                 extension[0] &= 0x7f;
+                extension[1] &= 0x7f;
+                extension[2] &= 0x7f;
 
                 // open new file
                 outFile.open(fileName + "." + extension, std::ios::out | std::ios::binary);
@@ -157,7 +163,9 @@ static void dump_files(const uint8_t* romBase, const uint32_t romSize)
                 {
                     if(dir->allocation_map[i])
                     {
-                        outFile.write((char*)block_address(fileBase, dir->allocation_map[i]), 1024);
+                        const uint32_t chunkSize = (bytesRemaining >= 1024) ? 1024 : bytesRemaining;
+                        outFile.write((char*)block_address(fileBase, dir->allocation_map[i]), chunkSize);
+                        bytesRemaining -= chunkSize;
                     }
                 }
 
@@ -175,7 +183,9 @@ static void dump_files(const uint8_t* romBase, const uint32_t romSize)
                 {
                     if(dir->allocation_map[i])
                     {
-                        outFile.write((char*)block_address(fileBase, dir->allocation_map[i]), 1024);
+                        const uint32_t chunkSize = (bytesRemaining >= 1024) ? 1024 : bytesRemaining;
+                        outFile.write((char*)block_address(fileBase, dir->allocation_map[i]), chunkSize);
+                        bytesRemaining -= chunkSize;
                     }
                 }
             }
